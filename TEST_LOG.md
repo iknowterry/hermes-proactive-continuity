@@ -96,7 +96,7 @@ Cleanup: both test profiles deleted, the two test cards archived, test files rem
 
 ### Installed in GB10's real profile (2026-11-15, evening)
 
-Installed from GitHub at `58590f0`, `setup` applied, heartbeat created paused. The hand-written "Multi-step work" block was removed from `SOUL.md` by hand and saved next to the backup as `removed-soul-block.md`. Model, fallback, auxiliary, delegation and compression sections compared equal to the backup. Live check in the real profile: Task B finished with 0 extra prompts, 10 s after the first reply, with two plugin continue messages in the gateway log. Gateway not restarted (same PID). Not yet checked on GB10's Telegram.
+Installed from GitHub at `58590f0`, `setup` applied, heartbeat created paused. The hand-written "Multi-step work" block was removed from `SOUL.md` by hand and saved next to the backup as `removed-soul-block.md`. Model, fallback, auxiliary, delegation and compression sections compared equal to the backup. Live check in the real profile: Task B finished with 0 extra prompts, 10 s after the first reply, with two plugin continue messages in the gateway log. Gateway not restarted (same PID). GB10's Telegram: Terry tried it after `/new` and reported that it works; this was not checked against GB10's gateway log. Heartbeat `e436761c4f2d` resumed on GB10 at 21:08.
 
 ## Success criteria from the brief
 
