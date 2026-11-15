@@ -373,6 +373,9 @@ def test_error_text_is_quoted_as_data():
     "git push", "git -C /r push origin main", "git -c http.proxy=x --git-dir /r/.git push",
     "cd /r && /usr/bin/git push", "FOO=1 git --no-pager push -f", "ls; git -C a -C b push",
     "git stash push; git push", "echo $(git push)", "git 'push",
+    'bash -c "git push origin main"', "sh -c 'cd /r && git -C . push'", "eval 'git push'",
+    "echo x | xargs -I{} sh -c 'git push {}'", "git -c alias.p=push p", "git -c 'alias.p=!git push' p",
+    'zsh -c "bash -c \\"git push\\""',
 ])
 def test_git_push_is_found_by_subcommand(command):
     assert riskgate.classify("terminal", {"command": command}), command
@@ -381,6 +384,7 @@ def test_git_push_is_found_by_subcommand(command):
 @pytest.mark.parametrize("command", [
     "git stash push -m wip", "git -C /r stash push", "git log --grep push", "git status; echo push",
     "git commit -m 'push later'", "git config alias.p status",
+    'bash -c "git status"', "echo 'remember to push'",
 ])
 def test_git_non_push_passes(command):
     assert riskgate.classify("terminal", {"command": command}) is None, command

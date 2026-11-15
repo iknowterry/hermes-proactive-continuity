@@ -82,13 +82,15 @@ _GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespac
 _SHELL_BREAK = re.compile(r"\|\||&&|[;|&\n(){}]|`")
 
 
-def _git_pushes(command: str) -> bool:
+def _git_pushes(command: str, depth: int = 0) -> bool:
     """True when any git invocation in the command has ``push`` as its subcommand.
     Global options and their values are skipped, so ``git -C x push`` counts and
-    ``git stash push`` or ``git log --grep push`` do not. If a piece cannot be
-    parsed, any git call that mentions push counts."""
+    ``git stash push`` or ``git log --grep push`` do not. Quoted arguments are
+    opened too (``bash -c "git push"``, ``xargs``, ``eval``), and a ``-c alias``
+    that contains push counts. If a piece cannot be parsed, any git call that
+    mentions push counts."""
     for piece in _SHELL_BREAK.split(command):
-        if "git" not in piece:
+        if "git" not in piece.lower():
             continue
         try:
             words = shlex.split(piece)
@@ -97,11 +99,21 @@ def _git_pushes(command: str) -> bool:
                 return True
             continue
         for i, word in enumerate(words):
+            # A quoted argument may itself be a command line: look inside it.
+            if depth < 4 and word != piece and re.search(r"\s", word) and _git_pushes(word, depth + 1):
+                return True
             if os.path.basename(word).lower() not in ("git", "git.exe"):
                 continue
             rest = words[i + 1:]
             while rest and rest[0].startswith("-"):
-                rest = rest[2:] if rest[0] in _GIT_VALUE_OPTS else rest[1:]
+                if rest[0] in _GIT_VALUE_OPTS:
+                    if len(rest) > 1 and "push" in rest[1].lower():
+                        return True          # -c alias.x=push, or a value that smuggles it
+                    rest = rest[2:]
+                else:
+                    if "push" in rest[0].lower():
+                        return True          # --config-env=...push..., -calias.x=push
+                    rest = rest[1:]
             if rest and rest[0].lower() == "push":
                 return True
     return False
