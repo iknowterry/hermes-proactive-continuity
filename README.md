@@ -1,5 +1,7 @@
 # proactive-continuity
 
+[![tests](https://github.com/iknowterry/hermes-proactive-continuity/actions/workflows/tests.yml/badge.svg)](https://github.com/iknowterry/hermes-proactive-continuity/actions/workflows/tests.yml)
+
 A Hermes plugin that makes your agent keep working, remember what is pending, and stay quiet until there is something to say.
 
 Without it, a typical agent finishes one step, reports "what's left", and waits for you to say "continue". With it, the agent:
@@ -15,6 +17,57 @@ Without it, a typical agent finishes one step, reports "what's left", and waits 
 It is a thin layer over features Hermes already has (Kanban, cron, approvals, memory, skills, delegation). It adds no tool, no scheduler, no memory store and no approval screen of its own, and it works with any model.
 
 Requires Hermes 0.23.1 or newer.
+
+## Proof it works
+
+These are real Telegram chats with a Hermes 0.23.1 agent running this plugin, taken on 2026-11-15. The full record, including what failed and was fixed along the way, is in [TEST_LOG.md](TEST_LOG.md).
+
+**It keeps going without being asked.** One message asked for three files, one per turn. The second and third replies arrived with no further input.
+
+![Three replies, the last two unprompted](docs/images/continue.png)
+
+**It asks before a risky action, and shows the command.** The card is Hermes' own approval card; the plugin only decides that this call needs one. If nobody answers within the timeout, the command does not run.
+
+![Approval card for git push with Allow Once, Session, Always and Deny](docs/images/approval-card.png)
+
+**A denial is final.** After Deny, the agent says what was skipped and does not retry.
+
+![Denied by the user; the agent will not retry](docs/images/deny.png)
+
+**An approval lets it through once.** The push ran and failed harmlessly (the test repo has no remote), and the agent reported the exact error.
+
+![Approved once; the agent reports the real result](docs/images/approve.png)
+
+**Longer work goes to the Kanban board and finishes in the background.** The agent queues a card instead of working in the chat. A worker completes it, Hermes posts the done notice, and the agent adds one line instead of repeating the result.
+
+![Card queued, done notice, one-line follow-up](docs/images/background.png)
+
+### Test cases
+
+| # | Case | How it was checked | Result |
+|---|---|---|---|
+| 1 | Finishes a 5-step task without asking "what next" | live turn | pass |
+| 2 | Continues on its own when steps remain, then stops | live, Telegram | pass |
+| 3 | Continue is capped per hour and never follows an interrupted turn | unit test | pass |
+| 4 | A new session knows the open cards without calling a tool | live turn | pass |
+| 5 | Work that must outlive the chat becomes a card and is finished by a worker | live, Telegram | pass |
+| 6 | Catch-up after idle names what finished and what is blocked | live, Telegram (idle time simulated) | pass |
+| 7 | `git push` needs approval; Deny is not retried | live, Telegram | pass |
+| 8 | Asking again after a denial gives a new card; Approve once runs it | live, Telegram | pass |
+| 9 | The card still reaches a person in `approvals.mode: smart` | live, Telegram | pass |
+| 10 | An unanswered card times out and the command does not run | live, Telegram | pass |
+| 11 | With nobody to ask (`chat -q`), a risky call is blocked | live turn | pass |
+| 12 | Risky tool names, commands and file paths are recognised; safe ones are not | 60+ unit cases | pass |
+| 13 | A failed tool is reported once, not repeated next turn | live turn + unit test | pass |
+| 14 | "Every morning at 9am..." creates a real Hermes cron job | live turn | pass |
+| 15 | Heartbeat sends nothing and makes no model call when the board is unchanged | live, triggered by hand | pass |
+| 16 | Kanban workers and sub-agents never count as the user | unit test (bug found live) | pass |
+| 17 | Uninstall returns `config.yaml` and `SOUL.md` byte-identical | `cmp` in a clean Hermes home | pass |
+| 18 | `hermes plugins validate`: hooks match the manifest, no core override, security scan safe | Hermes' own check | pass |
+
+Not yet tested: a local model, and before/after timing on a second machine.
+
+Run the unit tests yourself with the command under [Development](#development). They also run on every push; see the badge at the top.
 
 ## Install
 

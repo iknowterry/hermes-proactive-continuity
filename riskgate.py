@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from typing import Any, Iterable, Mapping, Optional
 
 DEFAULT_TOOL_WORDS = (
@@ -43,8 +44,6 @@ WRITE_TOOLS = frozenset({"write_file", "patch"})
 # as ``rm -rf`` are already caught by Hermes' own dangerous-command approval, so
 # they are not repeated here (that would ask the user twice).
 COMMAND_PATTERNS: tuple[tuple[str, str], ...] = (
-    # ``git -C dir push``, ``git --git-dir=x push``: options may sit before the subcommand.
-    (r"\bgit\b[^|;&\n]*?(?<!stash )\bpush\b", "pushes commits to a remote"),
     (r"\bgh\s+api\b.*(\s(-X|--method)[\s=]*(POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field|--input)[\s=])",
      "changes something on GitHub"),
     (r"\bgh\s+(pr\s+(create|merge|close)|release\s+create|issue\s+(create|close|comment)|repo\s+delete)\b",
@@ -77,6 +76,37 @@ _SENSITIVE_PARTS = (
     ".hermes/config.yaml", ".hermes/SOUL.md", ".hermes/auth.json", ".hermes/" + _DOTENV,
 )
 _SENSITIVE_NAMES = (".zshrc", ".bashrc", ".bash_profile", ".profile", ".gitconfig")
+# git global options that take a separate value: ``git -C dir push``.
+_GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
+                             "--super-prefix", "--config-env", "--attr-source"})
+_SHELL_BREAK = re.compile(r"\|\||&&|[;|&\n(){}]|`")
+
+
+def _git_pushes(command: str) -> bool:
+    """True when any git invocation in the command has ``push`` as its subcommand.
+    Global options and their values are skipped, so ``git -C x push`` counts and
+    ``git stash push`` or ``git log --grep push`` do not. If a piece cannot be
+    parsed, any git call that mentions push counts."""
+    for piece in _SHELL_BREAK.split(command):
+        if "git" not in piece:
+            continue
+        try:
+            words = shlex.split(piece)
+        except ValueError:
+            if re.search(r"\bgit\b.*\bpush\b", piece, re.IGNORECASE | re.DOTALL):
+                return True
+            continue
+        for i, word in enumerate(words):
+            if os.path.basename(word).lower() not in ("git", "git.exe"):
+                continue
+            rest = words[i + 1:]
+            while rest and rest[0].startswith("-"):
+                rest = rest[2:] if rest[0] in _GIT_VALUE_OPTS else rest[1:]
+            if rest and rest[0].lower() == "push":
+                return True
+    return False
+
+
 SENSITIVE_PATH = re.compile(
     r"(^|/)(" + "|".join(re.escape(part) for part in _SENSITIVE_PARTS)
     + "|" + re.escape(_DOTENV) + r"(\.|$)"
@@ -84,9 +114,12 @@ SENSITIVE_PATH = re.compile(
     re.IGNORECASE,
 )
 _PATCH_TARGET = re.compile(
-    r"^(?:\*\*\* (?:Update|Add|Delete|Move to) File:|\+\+\+|---|rename to|rename from)\s+(\S.*?)\s*$",
+    r"^(?:\*\*\* (?:Update|Add|Delete) File:|\*\*\* Move to(?: File)?:|\+\+\+|---|rename to|rename from|copy to)"
+    r"[ \t]+(\S[^\t\n]*?)[ \t]*(?:\t.*)?$",
     re.MULTILINE,
 )
+_PATCH_HEADER = re.compile(r"^\*\*\* (?!Begin Patch|End Patch|End of File)(.*)$", re.MULTILINE)
+_UNREADABLE = "\0unreadable-patch-header"
 _PATH_KEYS = ("path", "file_path", "filename", "target", "file", "dest", "destination")
 _PATCH_KEYS = ("patch", "diff", "content", "input", "changes")
 
@@ -111,7 +144,12 @@ def _write_targets(args: Mapping[str, Any]) -> list[str]:
     for key in _PATCH_KEYS:
         body = args.get(key)
         if isinstance(body, str):
-            targets += [m for m in _PATCH_TARGET.findall(body) if m != "/dev/null"]
+            found = [m for m in _PATCH_TARGET.findall(body) if m != "/dev/null"]
+            targets += found
+            # A "*** ..." header this code cannot read names a file it cannot check: ask.
+            if len(_PATCH_HEADER.findall(body)) > sum(1 for m in _PATCH_TARGET.finditer(body)
+                                                       if m.group(0).startswith("***")):
+                targets.append(_UNREADABLE)
     return targets
 
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -159,6 +197,8 @@ def classify(
         command = _first_text(args, ("command", "code", "script", "cmd"))
         preview = " ".join(command.split())
         preview = preview if len(preview) <= 140 else preview[:137] + "..."
+        if _git_pushes(command):
+            return f"the command pushes commits to a remote: {preview}"
         for pattern, why in COMMAND_PATTERNS:
             if re.search(pattern, command, re.IGNORECASE | re.DOTALL):
                 return f"the command {why}: {preview}"
@@ -172,6 +212,8 @@ def classify(
 
     if name in WRITE_TOOLS:
         for path in _write_targets(args):
+            if path == _UNREADABLE:
+                return "its patch names a file in a form that could not be checked"
             if _sensitive(path):
                 return f"it edits a system or credential file ({path[:140]})"
         return None

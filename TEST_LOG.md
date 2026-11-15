@@ -8,7 +8,7 @@ Live turns used a throwaway profile, `pctest`, cloned from `default` (main model
 
 | Check | Result |
 |---|---|
-| Unit tests (`pytest`, 63 tests) | 63 passed |
+| Unit tests (`pytest`, 82 tests) | 82 passed |
 | `hermes plugins doctor . --ci` | OK; 0 tools, 5 hooks |
 | `hermes plugins validate .` | Passed; declared hooks match; no core override; security scan `safe` |
 
@@ -64,6 +64,8 @@ Unit tests after these fixes: 43 passed. `hermes plugins validate`: passed, secu
 
 | S | Telegram, `approvals.mode: smart`, `git push origin main` after `/new` | The approval card still reached the user (Allow Once / Session / Always / Deny, "will NOT run" after 5 minutes). Plugin-escalated approvals are not decided by the smart judge, matching the source (`_run_approval_gate` calls the human gate without the smart flag) |
 
+| S2 | Same card left unanswered | "Approval timed out after 5 minutes — the command was NOT run." The agent then reported that the push was not executed. A "Working — 3 min" bubble appeared while it waited, the first time the built-in long-running notice was observed |
+
 ## Success criteria from the brief
 
 | Criterion | Status |
@@ -84,7 +86,8 @@ Unit tests after these fixes: 43 passed. `hermes plugins validate`: passed, secu
 
 ## Not tested
 
-- On Telegram: the Working bubble on a task that runs for several minutes, and the catch-up after real (not backdated) idle time.
+- On Telegram: the catch-up after real (not backdated) idle time.
+- The risk-gate hardening after the two security reviews is unit-tested only.
 - A local model.
 - Before/after measurements on GB10 (prompts needed per task, reply time, context size).
 
