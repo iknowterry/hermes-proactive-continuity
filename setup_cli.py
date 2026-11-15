@@ -56,12 +56,25 @@ def _sha(path: Path) -> Optional[str]:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
+def _parse_yaml(text: str) -> Any:
+    """Parse YAML with whichever library this Hermes runtime ships. Hermes itself
+    depends on ruamel.yaml; PyYAML is present in some installs and absent in
+    others, so it is only the fallback."""
+    try:
+        from ruamel.yaml import YAML
+        return YAML(typ="safe", pure=True).load(text)
+    except ImportError:
+        import yaml
+        return yaml.safe_load(text)
+
+
 def _load_config(home: Path) -> dict:
+    """The profile's config.yaml exactly as written (no defaults merged in), so
+    "unset" can be told apart from "set to the default"."""
     path = home / "config.yaml"
     if not path.is_file():
         return {}
-    import yaml
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data = _parse_yaml(path.read_text(encoding="utf-8"))
     return data if isinstance(data, dict) else {}
 
 

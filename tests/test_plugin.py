@@ -414,3 +414,20 @@ def test_execute_code_and_tabbed_patch_headers():
     assert riskgate.classify("patch", {"patch": "*** Begin Patch\n*** Add File: /etc/cron.d/x\tignored\n+x"})
     assert riskgate.classify("terminal", {"command": "git status"}) is None
     assert riskgate.classify("terminal", {"command": "echo $HOME && git log"}) is None
+
+
+def test_config_is_read_without_pyyaml(tmp_path, monkeypatch):
+    """Hermes ships ruamel.yaml; PyYAML is missing from some runtimes (found on Linux)."""
+    import builtins
+    pytest.importorskip("ruamel.yaml")
+    (tmp_path / "config.yaml").write_text("approvals:\n  timeout: 60   # note\nplugins:\n  enabled: [a]\n")
+    real = builtins.__import__
+
+    def no_pyyaml(name, *args, **kwargs):
+        if name == "yaml":
+            raise ImportError("No module named 'yaml'")
+        return real(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", no_pyyaml)
+    config = setup_cli._load_config(tmp_path)
+    assert config["approvals"]["timeout"] == 60 and config["plugins"]["enabled"] == ["a"]
+    assert setup_cli._load_config(tmp_path / "missing") == {}

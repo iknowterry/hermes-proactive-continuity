@@ -179,7 +179,7 @@ For long tasks you start yourself, the built-in `/goal <text>` is still the stro
 ## Development
 
 ```bash
-uv run --no-project --with pytest --with pyyaml python -m pytest -q
+uv run --no-project --with pytest --with pyyaml --with ruamel.yaml python -m pytest -q
 ```
 
 ```bash
