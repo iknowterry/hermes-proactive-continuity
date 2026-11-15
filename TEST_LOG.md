@@ -8,7 +8,7 @@ Live turns used a throwaway profile, `pctest`, cloned from `default` (main model
 
 | Check | Result |
 |---|---|
-| Unit tests (`pytest`, 96 tests) | 96 passed |
+| Unit tests (`pytest`, 98 tests) | 98 passed |
 | `hermes plugins doctor . --ci` | OK; 0 tools, 5 hooks |
 | `hermes plugins validate .` | Passed; declared hooks match; no core override; security scan `safe` |
 
@@ -66,6 +66,34 @@ Unit tests after these fixes: 43 passed. `hermes plugins validate`: passed, secu
 
 | S2 | Same card left unanswered | "Approval timed out after 5 minutes — the command was NOT run." The agent then reported that the push was not executed. A "Working — 3 min" bubble appeared while it waited, the first time the built-in long-running notice was observed |
 
+## GB10 (Linux aarch64, Hermes v0.23.1), before and after
+
+Run over SSH with `hermes chat -q` in throwaway profiles cloned from the real ones, so the real profiles were never changed. One run per cell; treat the timings as indicative, not as a benchmark. "Before" is GB10 as it was: no plugin, but with the hand-written "Multi-step work" block in `SOUL.md`.
+
+Task A: five file steps in one message. Task B: three files, one per turn.
+
+| Model | Measure | Before | After |
+|---|---|---|---|
+| `gpt-6-sol` | Task A: time to done | 22.4 s | 9.8 s |
+| `gpt-6-sol` | Task A: input tokens | 47,204 | 31,915 |
+| `gpt-6-sol` | Task B: extra "continue" messages the user had to send | 2 | 0 |
+| `gpt-6-sol` | Task B: wait after the first reply | stuck (nothing for 90 s) | all three files after 10 s |
+| `gemma4-26b` (local, llama-server) | Task B: extra "continue" messages | 2 | 0 |
+| `gemma4-26b` (local) | Task B: wait after the first reply | stuck (nothing for 90 s) | all three files after 10 s |
+| `gemma4-26b` (local) | Task A: done in one turn | not measured | yes, 35.5 s |
+| both | `git push` with nobody to ask | not measured | blocked, no retry |
+
+The "after" figures for `gpt-6-sol` are from the test profile with the hand-written `SOUL.md` block removed. With that block still present, the agent created a Kanban card even for the short Task A (reply in 7.4 s, work finished by a worker), and in Task B both the chat and a worker did the same work. The hand-written block says to create a card for *any* multi-step task, which conflicts with the plugin's rule. Remove it when installing on GB10.
+
+Bugs found on GB10 and fixed:
+
+| Bug | Fix |
+|---|---|
+| `setup` crashed with "No module named 'yaml'": PyYAML is not in this Hermes runtime | Read config with `ruamel.yaml`, which Hermes depends on; PyYAML is only a fallback |
+| With the local model, a reply that was only the continue marker, in a turn where one tool had been blocked, was replaced with "I could not finish" although work was carrying on | An empty reply is replaced with the failure list only when there was no continue marker |
+
+Cleanup: both test profiles deleted, the two test cards archived, test files removed. The gateway was not restarted (same PID before and after) and the real `SOUL.md` and `config.yaml` were not written.
+
 ## Success criteria from the brief
 
 | Criterion | Status |
@@ -82,14 +110,13 @@ Unit tests after these fixes: 43 passed. `hermes plugins validate`: passed, secu
 | Catch-up on return after idle | **Met** after the fix (test 7) |
 | Forced tool failure is reported | **Met** for the natural case (test 8). The empty-reply fallback is unit-tested only |
 | Uninstall is byte-identical | **Met** |
-| Works with one API model and one local model | API model only. **No local model run** |
+| Works with one API model and one local model | **Met**: `gpt-6-sol` and local `gemma4-26b` on GB10 |
 
 ## Not tested
 
 - On Telegram: the catch-up after real (not backdated) idle time.
 - The risk-gate hardening after the two security reviews is unit-tested only.
-- A local model.
-- Before/after measurements on GB10 (prompts needed per task, reply time, context size).
+- GB10 was measured in local sessions, one run per cell; Telegram on GB10 and repeated runs were not done.
 
 ## Side effects of testing on this Mac
 

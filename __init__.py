@@ -217,7 +217,9 @@ def register(ctx) -> None:
             replaced = stripped or "Working on the next step."
         with _lock:
             failed = dict(_failures.get(session_id, {}))
-        if not stripped and failed and cfg("report_failures", True):
+        # Only a reply that is empty on its own is replaced. A reply that was just
+        # the continue marker means work is carrying on, not that it stopped.
+        if replaced is None and not stripped and failed and cfg("report_failures", True):
             lines = "\n".join(f"- {tool}: {_quote(error)}" for tool, error in failed.items())
             replaced = "I could not finish. These tools failed:\n" + lines
         with _lock:

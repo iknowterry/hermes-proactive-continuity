@@ -64,8 +64,21 @@ These are real Telegram chats with a Hermes 0.23.1 agent running this plugin, ta
 | 16 | Kanban workers and sub-agents never count as the user | unit test (bug found live) | pass |
 | 17 | Uninstall returns `config.yaml` and `SOUL.md` byte-identical | `cmp` in a clean Hermes home | pass |
 | 18 | `hermes plugins validate`: hooks match the manifest, no core override, security scan safe | Hermes' own check | pass |
+| 19 | Works with a local model (Gemma 26B on llama-server): continues on its own, risk gate blocks | live turn, Linux | pass |
+| 20 | Installs from GitHub and sets up on Linux (aarch64) | live, second machine | pass |
 
-Not yet tested: a local model, and before/after timing on a second machine.
+### Before and after
+
+Measured on a second machine (Linux, Hermes 0.23.1), same tasks, one run each. Task B asks for three files, one per turn.
+
+| Model | Measure | Before | After |
+|---|---|---|---|
+| API model | Task B: "continue" messages the user had to send | 2 | 0 |
+| API model | Task B: after the first reply | stuck until prompted | finished in 10 s |
+| Local Gemma 26B | Task B: "continue" messages the user had to send | 2 | 0 |
+| API model | Five-step task, time to done | 22.4 s | 9.8 s |
+
+One run per cell, so read the timings as indicative.
 
 Run the unit tests yourself with the command under [Development](#development). They also run on every push; see the badge at the top.
 
@@ -157,7 +170,7 @@ The first command removes the heartbeat job and its script and restores `config.
 
 ## Model note
 
-The plugin does not choose or change models. It was built to work with any model that can call tools. Small local models follow multi-step rules less reliably: they may skip creating a card or forget the continue marker. For the main agent, use a model that is good at tool calls.
+The plugin does not choose or change models. It has been run with an API model and with a local Gemma 26B on llama-server; both continued on their own. Smaller local models may follow multi-step rules less reliably: they may skip creating a card or forget the continue marker. For the main agent, use a model that is good at tool calls.
 
 For long tasks you start yourself, the built-in `/goal <text>` is still the strongest option: a judge model checks each turn and keeps the agent going until the goal is met. This plugin covers the everyday case where you did not think to set a goal.
 

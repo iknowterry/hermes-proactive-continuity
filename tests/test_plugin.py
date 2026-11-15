@@ -431,3 +431,13 @@ def test_config_is_read_without_pyyaml(tmp_path, monkeypatch):
     config = setup_cli._load_config(tmp_path)
     assert config["approvals"]["timeout"] == 60 and config["plugins"]["enabled"] == ["a"]
     assert setup_cli._load_config(tmp_path / "missing") == {}
+
+
+def test_marker_only_reply_with_an_earlier_failure_keeps_going():
+    """Found with a local model: one tool was blocked, another worked, reply was only the marker."""
+    ctx = make(cards=None)
+    tool, reply, end = (ctx.hooks[n] for n in ("post_tool_call", "transform_llm_output", "on_session_end"))
+    tool(tool_name="execute_code", status="error", error_message="BLOCKED: needs approval", session_id="s13")
+    assert reply(response_text="[CONTINUE]", session_id="s13") == "Working on the next step."
+    end(session_id="s13", completed=True, interrupted=False)
+    assert ctx.injected == [rules.CONTINUE_PROMPT]
