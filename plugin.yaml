@@ -1,0 +1,71 @@
+name: proactive-continuity
+version: "0.1.0"
+manifest_version: 2
+api_version: 1
+description: >-
+  Keeps the agent working through multi-step tasks, remembers pending work on
+  the Kanban board across sessions, stays quiet until there is a result, and
+  asks before risky actions. Glue over built-in Kanban, cron, approvals and
+  memory; works with any model.
+author: Terry (iknowterry.com)
+license: MIT
+homepage: https://github.com/iknowterry/hermes-proactive-continuity
+tags: [automation, kanban, approvals, telegram, continuity]
+requires_hermes: ">=0.23.1"
+
+provides_hooks:
+  - pre_llm_call
+  - pre_tool_call
+  - post_tool_call
+  - transform_llm_output
+  - on_session_end
+
+config_schema:
+  rules_enabled:
+    type: bool
+    default: true
+    description: Add the working rules to each new session's system prompt.
+  inject_open_cards:
+    type: bool
+    default: true
+    description: Show the short list of open Kanban cards to the agent when a session starts or the board changes.
+  max_cards:
+    type: int
+    default: 5
+    description: Maximum open cards listed in the injected context.
+  catchup_idle_minutes:
+    type: int
+    default: 180
+    description: After this much silence, the next message gets a short "while you were away" catch-up. 0 turns it off.
+  auto_continue:
+    type: bool
+    default: true
+    description: Continue with the next step when the agent ends a turn with work remaining. Needs allow_gateway_injection on messaging platforms.
+  auto_continue_max_per_hour:
+    type: int
+    default: 6
+    description: Hard cap on automatic continuations per session per hour.
+  risk_gate:
+    type: bool
+    default: true
+    description: Ask for approval before tools that send, post, spend, trade, deploy or edit system config.
+  risk_tool_words:
+    type: list
+    default: [send, post, publish, reply, tweet, email, pay, purchase, buy, trade, order, transfer, withdraw, deploy, delete, remove]
+    description: A tool whose name contains one of these words needs approval.
+  risk_exempt_tools:
+    type: list
+    default: []
+    description: Tool names the risk gate never asks about.
+  risk_command_patterns:
+    type: list
+    default: []
+    description: Extra regular expressions; a terminal command matching one needs approval.
+  report_failures:
+    type: bool
+    default: true
+    description: Make sure a failed tool is named to the user instead of the agent going silent.
+  context_warn_tokens:
+    type: int
+    default: 60000
+    description: Suggest /new once the conversation passes roughly this many tokens. 0 turns it off.
