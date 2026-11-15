@@ -109,6 +109,7 @@ Setup backs up `config.yaml` and `SOUL.md` to `~/.hermes/backups/proactive-conti
 | `display.platforms.telegram.long_running_notifications: true` | the built-in "Working" bubble |
 | `plugins.entries.proactive-continuity.allow_gateway_injection: true` | lets the plugin send "continue with the next step" |
 | enable the `kanban` toolset for `cli` and the platform | the agent can create and read cards |
+| add `continuity` to `platforms.telegram.extra.command_menu.priority` | Telegram's command menu is capped and core commands fill it; without this `/continuity` works when typed but never appears in the menu |
 | a cron job "Proactive Continuity heartbeat", created **paused** | reports cards that finished or got blocked |
 
 Setup never touches model, provider, fallback or auxiliary settings. It does not edit `SOUL.md`; the rules are added through Hermes' system prompt section API instead. It does not restart the gateway. Some display settings only take effect after a gateway restart, which is yours to do.
@@ -144,7 +145,7 @@ Set these under `plugins.entries.proactive-continuity.settings` in `config.yaml`
 | `report_failures` | `true` | make sure a failed tool is named to the user |
 | `context_warn_tokens` | `60000` | suggest `/new` past this size; `0` is off |
 
-`/continuity` in any chat shows the open cards and which parts are on. `hermes proactive-continuity status` shows the settings setup manages.
+`/continuity` in any chat shows the open cards and which parts are on. In Telegram it appears in the `/` menu after setup and a gateway restart; it works when typed either way. `hermes proactive-continuity status` shows the settings setup manages.
 
 ## How the risk gate works
 

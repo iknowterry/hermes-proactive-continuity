@@ -24,6 +24,7 @@ PLUGIN = "proactive-continuity"
 CRON_NAME = "Proactive Continuity heartbeat"
 SCRIPT_NAME = "proactive_continuity_board.py"
 MISSING = "__missing__"
+MENU_COMMAND = "continuity"
 PROTECTED_SECTIONS = ("model", "provider", "providers", "fallback", "fallback_providers",
                       "auxiliary", "delegation")
 
@@ -90,6 +91,8 @@ def _lookup(config: dict, dotted: str) -> Any:
 def _text(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, (list, dict)):
+        return json.dumps(value)
     return str(value)
 
 
@@ -110,6 +113,14 @@ def planned_settings(config: dict, platform: str, auto_continue: bool,
         wanted.append(("approvals.timeout", 300))
     if auto_continue:
         wanted.append((f"plugins.entries.{PLUGIN}.allow_gateway_injection", True))
+    if platform == "telegram":
+        # Telegram's command menu is capped and core commands fill it, so a plugin
+        # command never shows unless it is named in the priority list.
+        menu_key = "platforms.telegram.extra.command_menu.priority"
+        current = _lookup(config, menu_key)
+        current = list(current) if isinstance(current, list) else []
+        if MENU_COMMAND not in current:
+            wanted.append((menu_key, current + [MENU_COMMAND]))
     if manual_approvals:
         wanted.append(("approvals.mode", "manual"))            # every approval goes to a person
     for key, _ in wanted:
@@ -231,8 +242,8 @@ def cmd_setup(args) -> int:
     print(f"\nDone. Backup and record: {backup}")
     if manifest["cron_id"]:
         print(f"Heartbeat is paused. Turn it on with: hermes cron resume {manifest['cron_id']}")
-    print("Start a new chat (/new) so the rules and tools load. Display settings may need a "
-          "gateway restart, which this plugin never does for you.")
+    print("Start a new chat (/new) so the rules and tools load. Display settings, and /continuity "
+          "in Telegram's command menu, need a gateway restart, which this plugin never does for you.")
     return 1 if failed else 0
 
 

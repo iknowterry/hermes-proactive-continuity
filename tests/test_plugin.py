@@ -441,3 +441,14 @@ def test_marker_only_reply_with_an_earlier_failure_keeps_going():
     assert reply(response_text="[CONTINUE]", session_id="s13") == "Working on the next step."
     end(session_id="s13", completed=True, interrupted=False)
     assert ctx.injected == [rules.CONTINUE_PROMPT]
+
+
+def test_setup_puts_continuity_in_the_telegram_menu_priority():
+    key = "platforms.telegram.extra.command_menu.priority"
+    assert dict(setup_cli.planned_settings({}, "telegram", True))[key] == ["continuity"]
+    mine = {"platforms": {"telegram": {"extra": {"command_menu": {"priority": ["excalidraw"]}}}}}
+    assert dict(setup_cli.planned_settings(mine, "telegram", True))[key] == ["excalidraw", "continuity"]
+    done = {"platforms": {"telegram": {"extra": {"command_menu": {"priority": ["continuity"]}}}}}
+    assert key not in dict(setup_cli.planned_settings(done, "telegram", True))
+    assert key not in dict(setup_cli.planned_settings({}, "discord", True))
+    assert setup_cli._text(["a", "b"]) == '["a", "b"]'
