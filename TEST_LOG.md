@@ -94,6 +94,10 @@ Bugs found on GB10 and fixed:
 
 Cleanup: both test profiles deleted, the two test cards archived, test files removed. The gateway was not restarted (same PID before and after) and the real `SOUL.md` and `config.yaml` were not written.
 
+### Installed in GB10's real profile (2026-11-15, evening)
+
+Installed from GitHub at `58590f0`, `setup` applied, heartbeat created paused. The hand-written "Multi-step work" block was removed from `SOUL.md` by hand and saved next to the backup as `removed-soul-block.md`. Model, fallback, auxiliary, delegation and compression sections compared equal to the backup. Live check in the real profile: Task B finished with 0 extra prompts, 10 s after the first reply, with two plugin continue messages in the gateway log. Gateway not restarted (same PID). Not yet checked on GB10's Telegram.
+
 ## Success criteria from the brief
 
 | Criterion | Status |
