@@ -88,6 +88,8 @@ For shell commands it asks about `git push`, package publishing, hosting deploys
 
 In scheduled jobs the gate follows `approvals.cron_mode` (default `deny`).
 
+The gate is a best-effort list of recognisable risky calls, not a sandbox. A command can be written in ways no pattern list catches, so it works alongside Hermes' own guards, not in place of them. A tool whose name says it sends, posts, pays or deletes always asks, whatever arguments it is given.
+
 ## Uninstall
 
 ```bash

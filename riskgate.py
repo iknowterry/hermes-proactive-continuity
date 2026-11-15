@@ -1,5 +1,9 @@
 """Decide whether a tool call should go to the built-in human-approval gate.
 
+This is a best-effort list of recognisable risky calls, not a sandbox: a command
+can be written in ways no pattern list catches. It exists to put a person in
+front of the common outward-facing actions, on top of Hermes' own guards.
+
 Pure functions, no Hermes imports. ``classify`` returns a short reason when the
 call needs approval and ``None`` when it does not. The plugin only ever *adds*
 an approval; it never approves anything itself.
@@ -7,6 +11,7 @@ an approval; it never approves anything itself.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Iterable, Mapping, Optional
 
@@ -38,7 +43,10 @@ WRITE_TOOLS = frozenset({"write_file", "patch"})
 # as ``rm -rf`` are already caught by Hermes' own dangerous-command approval, so
 # they are not repeated here (that would ask the user twice).
 COMMAND_PATTERNS: tuple[tuple[str, str], ...] = (
-    (r"\bgit\s+push\b", "pushes commits to a remote"),
+    # ``git -C dir push``, ``git --git-dir=x push``: options may sit before the subcommand.
+    (r"\bgit\b[^|;&\n]*?(?<!stash )\bpush\b", "pushes commits to a remote"),
+    (r"\bgh\s+api\b.*(\s(-X|--method)[\s=]*(POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field|--input)[\s=])",
+     "changes something on GitHub"),
     (r"\bgh\s+(pr\s+(create|merge|close)|release\s+create|issue\s+(create|close|comment)|repo\s+delete)\b",
      "changes something on GitHub"),
     (r"\b(npm|pnpm|yarn)\s+publish\b|\btwine\s+upload\b|\bcargo\s+publish\b|\bgem\s+push\b",
@@ -50,7 +58,9 @@ COMMAND_PATTERNS: tuple[tuple[str, str], ...] = (
      "changes a Kubernetes cluster"),
     (r"\bterraform\s+(apply|destroy)\b|\bpulumi\s+(up|destroy)\b", "changes cloud infrastructure"),
     (r"\b(sendmail|mailx|mutt|msmtp)\b|\bmail\s+-s\b", "sends email"),
-    (r"\bcurl\b.*\s(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b|\bcurl\b.*\s(-d|--data\S*|-F|--form)\s",
+    (r"\bcurl\b.*\s(-X|--request)[\s=]*(POST|PUT|PATCH|DELETE)\b"
+     r"|\bcurl\b.*\s(-d|--data\S*|-F|--form\S*|--json|-T|--upload-file)[\s=]"
+     r"|\bwget\b.*\s(--post-data|--post-file|--body-data|--body-file|--method)[\s=]",
      "sends data to a web service"),
     (r"\bhermes\s+(config\s+(set|unset)|plugins\s+(install|enable|remove)|update|gateway\s+(restart|stop))\b",
      "changes Hermes itself"),
@@ -70,14 +80,57 @@ _SENSITIVE_NAMES = (".zshrc", ".bashrc", ".bash_profile", ".profile", ".gitconfi
 SENSITIVE_PATH = re.compile(
     r"(^|/)(" + "|".join(re.escape(part) for part in _SENSITIVE_PARTS)
     + "|" + re.escape(_DOTENV) + r"(\.|$)"
-    + "|(" + "|".join(re.escape(name) for name in _SENSITIVE_NAMES) + r")$)"
+    + "|(" + "|".join(re.escape(name) for name in _SENSITIVE_NAMES) + r")$)",
+    re.IGNORECASE,
 )
+_PATCH_TARGET = re.compile(
+    r"^(?:\*\*\* (?:Update|Add|Delete|Move to) File:|\+\+\+|---|rename to|rename from)\s+(\S.*?)\s*$",
+    re.MULTILINE,
+)
+_PATH_KEYS = ("path", "file_path", "filename", "target", "file", "dest", "destination")
+_PATCH_KEYS = ("patch", "diff", "content", "input", "changes")
 
+
+def _sensitive(path: str) -> bool:
+    """Match the path as written and as the filesystem would resolve it."""
+    raw = path.strip().replace("\\", "/")
+    if raw.startswith(("a/", "b/")):
+        raw = raw[2:]
+    forms = {raw}
+    try:
+        expanded = os.path.expanduser(raw)
+        forms.add(os.path.normpath(expanded).replace("\\", "/"))
+        forms.add(os.path.realpath(expanded).replace("\\", "/"))
+    except (OSError, ValueError):
+        pass
+    return any(SENSITIVE_PATH.search(form) for form in forms)
+
+
+def _write_targets(args: Mapping[str, Any]) -> list[str]:
+    targets = [args[key] for key in _PATH_KEYS if isinstance(args.get(key), str) and args[key]]
+    for key in _PATCH_KEYS:
+        body = args.get(key)
+        if isinstance(body, str):
+            targets += [m for m in _PATCH_TARGET.findall(body) if m != "/dev/null"]
+    return targets
+
+_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _SPLIT = re.compile(r"[^a-z0-9]+")
 
 
 def _words(name: str) -> list[str]:
-    return [w for w in _SPLIT.split(name.lower()) if w]
+    """``sendEmail``, ``send-email`` and ``send_email`` all give ``[send, email]``."""
+    return [w for w in _SPLIT.split(_CAMEL.sub("_", name).lower()) if w]
+
+
+def _risky_word(text: str, wanted: set[str]) -> Optional[str]:
+    """A wanted word in ``text``, also matching short endings (sends, posted,
+    deleting) but not longer unrelated words (postgres, reorder)."""
+    for word in _words(text):
+        for want in wanted:
+            if word == want or (word.startswith(want) and len(word) - len(want) <= 3):
+                return want
+    return None
 
 
 def _first_text(args: Mapping[str, Any], keys: Iterable[str]) -> str:
@@ -118,21 +171,23 @@ def classify(
         return None
 
     if name in WRITE_TOOLS:
-        path = _first_text(args, ("path", "file_path", "filename", "target"))
-        if path and SENSITIVE_PATH.search(path.replace("\\", "/")):
-            return f"it edits a system or credential file ({path})"
-        return None
-
-    action = args.get("action")
-    if isinstance(action, str) and action.lower() in READ_ONLY_ACTIONS:
+        for path in _write_targets(args):
+            if _sensitive(path):
+                return f"it edits a system or credential file ({path[:140]})"
         return None
 
     wanted = {str(w).lower() for w in tool_words}
-    hit = next((w for w in _words(name) if w in wanted), None)
-    if hit is None and isinstance(action, str):
-        hit = next((w for w in _words(action) if w in wanted), None)
+    hit = _risky_word(name, wanted)
     if hit:
+        # The tool's own name says it acts; an ``action`` argument cannot talk it out of that.
         return f"it would {hit} something outside this chat"
+    action = args.get("action")
+    if isinstance(action, str):
+        if action.lower() in READ_ONLY_ACTIONS:
+            return None
+        hit = _risky_word(action, wanted)
+        if hit:
+            return f"it would {hit} something outside this chat"
     return None
 
 
