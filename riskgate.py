@@ -116,6 +116,12 @@ def _git_pushes(command: str, depth: int = 0) -> bool:
                     rest = rest[1:]
             if rest and rest[0].lower() == "push":
                 return True
+            # ``git $CMD`` or ``git $(...)``: the subcommand is decided at run time, so
+            # it cannot be ruled out. The split above leaves a bare ``$`` or a ``$VAR``.
+            if not rest or "$" in rest[0] or "`" in rest[0]:
+                if not rest or rest[0].strip("\"'") in ("$", "") or "$" in rest[0]:
+                    if re.search(r"[$`]", command):
+                        return True
     return False
 
 
@@ -125,9 +131,12 @@ SENSITIVE_PATH = re.compile(
     + "|(" + "|".join(re.escape(name) for name in _SENSITIVE_NAMES) + r")$)",
     re.IGNORECASE,
 )
+# "*** ..." headers keep the whole rest of the line; only ---/+++ lines carry a
+# tab-separated timestamp that is not part of the path.
 _PATCH_TARGET = re.compile(
-    r"^(?:\*\*\* (?:Update|Add|Delete) File:|\*\*\* Move to(?: File)?:|\+\+\+|---|rename to|rename from|copy to)"
-    r"[ \t]+(\S[^\t\n]*?)[ \t]*(?:\t.*)?$",
+    r"^(?:(?:\*\*\* (?:Update|Add|Delete) File:|\*\*\* Move to(?: File)?:|rename to|rename from|copy to)"
+    r"[ \t]+(\S[^\n]*?)[ \t]*"
+    r"|(?:\+\+\+|---)[ \t]+(\S[^\t\n]*?)[ \t]*(?:\t.*)?)$",
     re.MULTILINE,
 )
 _PATCH_HEADER = re.compile(r"^\*\*\* (?!Begin Patch|End Patch|End of File)(.*)$", re.MULTILINE)
@@ -156,8 +165,9 @@ def _write_targets(args: Mapping[str, Any]) -> list[str]:
     for key in _PATCH_KEYS:
         body = args.get(key)
         if isinstance(body, str):
-            found = [m for m in _PATCH_TARGET.findall(body) if m != "/dev/null"]
-            targets += found
+            found = [a or b for a, b in _PATCH_TARGET.findall(body) if (a or b) != "/dev/null"]
+            # A tab or control character inside a path is a sign of a header built to mislead.
+            targets += [_UNREADABLE if re.search(r"[\x00-\x1f\x7f]", m) else m for m in found]
             # A "*** ..." header this code cannot read names a file it cannot check: ask.
             if len(_PATCH_HEADER.findall(body)) > sum(1 for m in _PATCH_TARGET.finditer(body)
                                                        if m.group(0).startswith("***")):
@@ -209,7 +219,9 @@ def classify(
         command = _first_text(args, ("command", "code", "script", "cmd"))
         preview = " ".join(command.split())
         preview = preview if len(preview) <= 140 else preview[:137] + "..."
-        if _git_pushes(command):
+        if _git_pushes(command) or (
+                # Code is not a shell line: any git call that mentions push counts.
+                name == "execute_code" and re.search(r"\bgit\b.*\bpush\b", command, re.IGNORECASE | re.DOTALL)):
             return f"the command pushes commits to a remote: {preview}"
         for pattern, why in COMMAND_PATTERNS:
             if re.search(pattern, command, re.IGNORECASE | re.DOTALL):

@@ -8,7 +8,7 @@ Live turns used a throwaway profile, `pctest`, cloned from `default` (main model
 
 | Check | Result |
 |---|---|
-| Unit tests (`pytest`, 91 tests) | 91 passed |
+| Unit tests (`pytest`, 96 tests) | 96 passed |
 | `hermes plugins doctor . --ci` | OK; 0 tools, 5 hooks |
 | `hermes plugins validate .` | Passed; declared hooks match; no core override; security scan `safe` |
 

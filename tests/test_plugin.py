@@ -376,6 +376,7 @@ def test_error_text_is_quoted_as_data():
     'bash -c "git push origin main"', "sh -c 'cd /r && git -C . push'", "eval 'git push'",
     "echo x | xargs -I{} sh -c 'git push {}'", "git -c alias.p=push p", "git -c 'alias.p=!git push' p",
     'zsh -c "bash -c \\"git push\\""',
+    "git $(echo push) origin main", "c=push; git $c", "git `echo push`", 'git "$SUB" origin',
 ])
 def test_git_push_is_found_by_subcommand(command):
     assert riskgate.classify("terminal", {"command": command}), command
@@ -403,3 +404,13 @@ def test_ordinary_patch_still_passes():
     body = "*** Begin Patch\n*** Update File: src/a.py\n*** Move to: src/b.py\n@@\n-a\n+b\n*** End Patch"
     assert riskgate.classify("patch", {"patch": body}) is None
     assert riskgate.classify("patch", {"diff": "--- a/x.py\t2026\n+++ b/x.py\t2026\n@@\n+1"}) is None
+
+
+def test_execute_code_and_tabbed_patch_headers():
+    assert riskgate.classify("execute_code", {"code": "import subprocess\nsubprocess.run(['git', 'push'])"})
+    assert riskgate.classify("execute_code", {"code": "print('hello')"}) is None
+    # a tab must not cut the real target off a "***" header
+    assert riskgate.classify("patch", {"patch": "*** Begin Patch\n*** Update File: notes.md\t/etc/hosts\n@@\n+x"})
+    assert riskgate.classify("patch", {"patch": "*** Begin Patch\n*** Add File: /etc/cron.d/x\tignored\n+x"})
+    assert riskgate.classify("terminal", {"command": "git status"}) is None
+    assert riskgate.classify("terminal", {"command": "echo $HOME && git log"}) is None
