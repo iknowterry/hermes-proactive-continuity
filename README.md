@@ -92,7 +92,7 @@ hermes plugins install proactive-continuity --enable
 hermes proactive-continuity setup
 ```
 
-The first command installs and enables the plugin. Until the plugin is listed in the Hermes catalog, install it from the repository instead: `hermes plugins install iknowterry/hermes-proactive-continuity --enable`.
+The first command installs and enables the plugin from the Hermes plugin catalog. To install the latest commit instead of the catalog's pinned one: `hermes plugins install iknowterry/hermes-proactive-continuity --enable`.
 
 The second command shows every change it is about to make and asks before applying. Add `--dry-run` to only look. Then start a new chat (`/new`) so the rules and tools load.
 
