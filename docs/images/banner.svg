@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+  <title>proactive-continuity banner</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#060718"/>
+      <stop offset="0.55" stop-color="#0a0c2c"/>
+      <stop offset="1" stop-color="#111650"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3b46ff" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#3b46ff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#3b46ff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#ffffff" fill-opacity="0.07"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#060718" stop-opacity="1"/>
+      <stop offset="0.45" stop-color="#060718" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#bg)"/>
+  <rect width="1200" height="600" fill="url(#dots)"/>
+
+  <!-- faint Kanban columns behind the mark -->
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="2">
+    <rect x="620" y="70" width="150" height="84" rx="12"/>
+    <rect x="620" y="170" width="150" height="84" rx="12"/>
+    <rect x="620" y="270" width="150" height="84" rx="12"/>
+    <rect x="1030" y="110" width="150" height="84" rx="12"/>
+    <rect x="1030" y="210" width="150" height="84" rx="12"/>
+    <rect x="1030" y="410" width="150" height="84" rx="12"/>
+    <rect x="620" y="440" width="150" height="84" rx="12"/>
+  </g>
+  <g fill="#ffffff" fill-opacity="0.10">
+    <rect x="640" y="92" width="80" height="8" rx="4"/>
+    <rect x="640" y="192" width="100" height="8" rx="4"/>
+    <rect x="640" y="292" width="70" height="8" rx="4"/>
+    <rect x="1050" y="132" width="90" height="8" rx="4"/>
+    <rect x="1050" y="232" width="60" height="8" rx="4"/>
+    <rect x="1050" y="432" width="100" height="8" rx="4"/>
+    <rect x="640" y="462" width="85" height="8" rx="4"/>
+  </g>
+
+  <rect width="1200" height="600" fill="url(#fade)"/>
+
+  <!-- the mark, scaled up, centred at (900, 300) -->
+  <circle cx="900" cy="300" r="230" fill="url(#glow)"/>
+  <g transform="translate(900 300) scale(1.18) translate(-256 -256)">
+    <path d="M 396.95 204.70 A 150 150 0 1 1 282.05 108.28" fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round"/>
+    <polygon points="320.4,115.1 277.4,77.1 267.0,136.1" fill="#ffffff" stroke="#ffffff" stroke-width="9" stroke-linejoin="round"/>
+    <line x1="190" y1="256" x2="322" y2="256" stroke="#ffffff" stroke-opacity="0.35" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="190" cy="256" r="18" fill="#ffffff"/>
+    <circle cx="256" cy="256" r="18" fill="#ffffff"/>
+    <circle cx="322" cy="256" r="29" fill="#4d5bff" fill-opacity="0.35"/>
+    <circle cx="322" cy="256" r="19" fill="#5b68ff" stroke="#ffffff" stroke-width="5"/>
+  </g>
+</svg>

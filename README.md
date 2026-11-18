@@ -1,3 +1,5 @@
+![proactive-continuity logo](docs/images/logo-128.png)
+
 # proactive-continuity
 
 [![tests](https://github.com/iknowterry/hermes-proactive-continuity/actions/workflows/tests.yml/badge.svg)](https://github.com/iknowterry/hermes-proactive-continuity/actions/workflows/tests.yml)
@@ -80,7 +82,7 @@ Measured on a second machine (Linux, Hermes 0.23.1), same tasks, one run each. T
 
 One run per cell, so read the timings as indicative.
 
-Run the unit tests yourself with the command under [Development](#development). They also run on every push; see the badge at the top.
+Run the unit tests yourself with the command in the Development section below. They also run on every push; see the badge at the top.
 
 ## Install
 
